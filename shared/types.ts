@@ -27,12 +27,23 @@ export interface TrainConfig {
   classifierType: 'multinomial' | 'bernoulli';
   testSize: number;
   randomState: number;
+  useStopwords: boolean;
+  useChineseTokenization: boolean;
+  ngramRange: [number, number];
+  maxFeatures: number;
 }
 
 export interface TrainResponse {
   success: boolean;
   modelId: string;
   status: 'training' | 'completed' | 'failed';
+}
+
+export interface TrainingConfig {
+  useStopwords: boolean;
+  useChineseTokenization: boolean;
+  ngramRange: [number, number];
+  maxFeatures: number;
 }
 
 export interface ModelMetrics {
@@ -42,13 +53,17 @@ export interface ModelMetrics {
   f1: number;
   confusionMatrix: number[][];
   labels: string[];
+  vocabularySize: number;
+  topFeatures: string[];
 }
 
 export interface TrainStatus {
   modelId: string;
   status: 'training' | 'completed' | 'failed';
   progress: number;
+  message?: string;
   metrics?: ModelMetrics;
+  config?: TrainingConfig;
 }
 
 export interface ModelInfo {

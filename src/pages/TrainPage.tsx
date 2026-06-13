@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, RotateCcw, ArrowRight, CheckCircle2, Loader2, AlertTriangle, Target, Crosshair, Zap, TrendingUp } from 'lucide-react';
+import { Play, RotateCcw, ArrowRight, CheckCircle2, Loader2, AlertTriangle, Target, Crosshair, Zap, TrendingUp, Languages, Filter, Hash, Settings } from 'lucide-react';
 import { apiService } from '@/services/api';
 import { useAppStore } from '@/store/appStore';
 import MetricCard from '@/components/MetricCard';
@@ -14,6 +14,11 @@ const TrainPage = () => {
   const [classifierType, setClassifierType] = useState<'multinomial' | 'bernoulli'>('multinomial');
   const [testSize, setTestSize] = useState(0.2);
   const [randomState, setRandomState] = useState(42);
+  const [useStopwords, setUseStopwords] = useState(true);
+  const [useChineseTokenization, setUseChineseTokenization] = useState(true);
+  const [ngramMin, setNgramMin] = useState(1);
+  const [ngramMax, setNgramMax] = useState(2);
+  const [maxFeatures, setMaxFeatures] = useState(10000);
   const [isTraining, setIsTraining] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pollInterval, setPollInterval] = useState<number | null>(null);
@@ -21,6 +26,11 @@ const TrainPage = () => {
   const startTraining = async () => {
     if (!currentDataset) {
       setError('请先上传数据');
+      return;
+    }
+
+    if (ngramMin > ngramMax) {
+      setError('N-gram 最小范围不能大于最大范围');
       return;
     }
 
@@ -35,6 +45,10 @@ const TrainPage = () => {
         classifierType,
         testSize,
         randomState,
+        useStopwords,
+        useChineseTokenization,
+        ngramRange: [ngramMin, ngramMax],
+        maxFeatures,
       };
 
       const result = await apiService.startTraining(config);
@@ -93,10 +107,12 @@ const TrainPage = () => {
   };
 
   const trainingSteps = [
-    { label: '数据加载', progress: 20 },
-    { label: '数据集划分', progress: 35 },
-    { label: '特征提取', progress: 55 },
-    { label: '模型训练', progress: 75 },
+    { label: '数据加载', progress: 10 },
+    { label: '中文分词', progress: 20 },
+    { label: '停用词过滤', progress: 30 },
+    { label: '数据集划分', progress: 45 },
+    { label: '特征提取', progress: 65 },
+    { label: '模型训练', progress: 80 },
     { label: '模型评估', progress: 90 },
     { label: '完成', progress: 100 },
   ];
@@ -257,6 +273,113 @@ const TrainPage = () => {
                     className="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                 </div>
+
+                <div className="pt-4 border-t border-slate-200">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Settings className="w-4 h-4 text-indigo-600" />
+                    <h4 className="text-sm font-semibold text-slate-900">高级设置</h4>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Languages className="w-4 h-4 text-slate-400" />
+                        <span className="text-sm text-slate-700">中文分词 (jieba)</span>
+                      </div>
+                      <button
+                        onClick={() => setUseChineseTokenization(!useChineseTokenization)}
+                        disabled={isTraining}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          useChineseTokenization ? 'bg-indigo-600' : 'bg-slate-300'
+                        } ${isTraining ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            useChineseTokenization ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Filter className="w-4 h-4 text-slate-400" />
+                        <span className="text-sm text-slate-700">停用词过滤</span>
+                      </div>
+                      <button
+                        onClick={() => setUseStopwords(!useStopwords)}
+                        disabled={isTraining}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          useStopwords ? 'bg-indigo-600' : 'bg-slate-300'
+                        } ${isTraining ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            useStopwords ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Hash className="w-4 h-4 text-slate-400" />
+                        <span className="text-sm font-medium text-slate-700">
+                          N-gram 范围: {ngramMin}-{ngramMax}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-xs text-slate-500 mb-1">最小</label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="5"
+                            value={ngramMin}
+                            onChange={(e) => setNgramMin(Math.max(1, parseInt(e.target.value) || 1))}
+                            disabled={isTraining}
+                            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-slate-500 mb-1">最大</label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="5"
+                            value={ngramMax}
+                            onChange={(e) => setNgramMax(Math.max(1, parseInt(e.target.value) || 1))}
+                            disabled={isTraining}
+                            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                          />
+                        </div>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-2">
+                        1=单字/词, 2=二元组, 3=三元组
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        最大特征数: {maxFeatures.toLocaleString()}
+                      </label>
+                      <input
+                        type="range"
+                        min="1000"
+                        max="50000"
+                        step="1000"
+                        value={maxFeatures}
+                        onChange={(e) => setMaxFeatures(parseInt(e.target.value))}
+                        disabled={isTraining}
+                        className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                      />
+                      <div className="flex justify-between text-xs text-slate-500 mt-1">
+                        <span>1,000</span>
+                        <span>50,000</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="mt-6 space-y-3">
@@ -302,7 +425,16 @@ const TrainPage = () => {
           <div className="lg:col-span-2 space-y-6">
             {isTraining && trainStatus && (
               <div className="bg-white rounded-2xl border border-slate-200 p-6">
-                <h3 className="text-lg font-semibold text-slate-900 mb-6">训练进度</h3>
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">训练进度</h3>
+                
+                {trainStatus.message && (
+                  <div className="mb-4 px-4 py-3 bg-indigo-50 border border-indigo-100 rounded-xl">
+                    <p className="text-sm text-indigo-700 font-medium">
+                      <Loader2 className="w-4 h-4 inline-block mr-2 animate-spin" />
+                      {trainStatus.message}
+                    </p>
+                  </div>
+                )}
                 
                 <div className="relative">
                   <div className="h-2 bg-slate-200 rounded-full overflow-hidden mb-6">
@@ -361,6 +493,42 @@ const TrainPage = () => {
             {trainStatus?.metrics && (
               <>
                 <h2 className="text-xl font-bold text-slate-900">模型评估结果</h2>
+                
+                {trainStatus.config && (
+                  <div className="bg-white rounded-2xl border border-slate-200 p-5">
+                    <h3 className="text-sm font-semibold text-slate-700 mb-3">训练配置</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div className="flex items-center gap-2">
+                        <Languages className="w-4 h-4 text-indigo-500" />
+                        <span className="text-slate-500">中文分词:</span>
+                        <span className="font-medium text-slate-700">
+                          {trainStatus.config.useChineseTokenization ? '开启' : '关闭'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Filter className="w-4 h-4 text-indigo-500" />
+                        <span className="text-slate-500">停用词过滤:</span>
+                        <span className="font-medium text-slate-700">
+                          {trainStatus.config.useStopwords ? '开启' : '关闭'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Hash className="w-4 h-4 text-indigo-500" />
+                        <span className="text-slate-500">N-gram:</span>
+                        <span className="font-medium text-slate-700">
+                          {trainStatus.config.ngramRange[0]}-{trainStatus.config.ngramRange[1]}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Settings className="w-4 h-4 text-indigo-500" />
+                        <span className="text-slate-500">词汇量:</span>
+                        <span className="font-medium text-slate-700">
+                          {trainStatus.metrics.vocabularySize?.toLocaleString() || 0}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 
                 <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <MetricCard
