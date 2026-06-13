@@ -81,6 +81,35 @@ export interface BatchPredictResult {
   }>;
 }
 
+export interface IncrementalTrainRequest {
+  datasetId?: string;
+  texts?: string[];
+  labels?: string[];
+}
+
+export interface IncrementalTrainResult {
+  success: boolean;
+  modelId: string;
+  samplesAdded: number;
+  totalSamples: number;
+  incrementalCount: number;
+  classes: string[];
+}
+
+export interface EvaluateResult {
+  success: boolean;
+  modelId: string;
+  metrics: {
+    accuracy: number;
+    precision: number;
+    recall: number;
+    f1: number;
+    confusionMatrix: number[][];
+    labels: string[];
+  };
+  sampleCount: number;
+}
+
 export const mlService = {
   async healthCheck() {
     const response = await mlClient.get('/health');
@@ -138,6 +167,16 @@ export const mlService = {
 
   async predictBatch(modelId: string, texts: string[]): Promise<BatchPredictResult> {
     const response = await mlClient.post('/api/predict/batch', { modelId, texts });
+    return response.data;
+  },
+
+  async incrementalTrain(modelId: string, data: IncrementalTrainRequest): Promise<IncrementalTrainResult> {
+    const response = await mlClient.post(`/api/models/${modelId}/incremental`, data);
+    return response.data;
+  },
+
+  async evaluateModel(modelId: string, texts: string[], labels: string[]): Promise<EvaluateResult> {
+    const response = await mlClient.post(`/api/models/${modelId}/evaluate`, { texts, labels });
     return response.data;
   },
 };

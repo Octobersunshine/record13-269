@@ -14,7 +14,10 @@ from models.text_classifier import (
     get_model_metrics,
     list_models,
     predict_text,
-    predict_batch
+    predict_batch,
+    incremental_train,
+    incremental_train_from_dataset,
+    evaluate_model
 )
 
 app = Flask(__name__)
@@ -135,6 +138,42 @@ def api_predict_batch():
             return jsonify({'success': False, 'error': 'Missing modelId or texts'}), 400
         
         result = predict_batch(data['modelId'], data['texts'])
+        return jsonify(result)
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/models/<model_id>/incremental', methods=['POST'])
+def api_incremental_train(model_id):
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+        
+        if 'datasetId' in data:
+            result = incremental_train_from_dataset(model_id, data['datasetId'])
+        elif 'texts' in data and 'labels' in data:
+            result = incremental_train(model_id, data['texts'], data['labels'])
+        else:
+            return jsonify({'success': False, 'error': 'Provide either datasetId or texts+labels'}), 400
+        
+        return jsonify(result)
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/models/<model_id>/evaluate', methods=['POST'])
+def api_evaluate_model(model_id):
+    try:
+        data = request.get_json()
+        if not data or 'texts' not in data or 'labels' not in data:
+            return jsonify({'success': False, 'error': 'Missing texts or labels'}), 400
+        
+        result = evaluate_model(model_id, data['texts'], data['labels'])
         return jsonify(result)
     except ValueError as e:
         return jsonify({'success': False, 'error': str(e)}), 400

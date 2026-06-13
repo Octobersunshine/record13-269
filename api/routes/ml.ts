@@ -136,4 +136,29 @@ router.post('/predict/batch', async (req: Request, res: Response) => {
   }
 });
 
+router.post('/models/:id/incremental', async (req: Request, res: Response) => {
+  try {
+    const result = await mlService.incrementalTrain(req.params.id, req.body);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Incremental training failed'
+    });
+  }
+});
+
+router.post('/models/:id/evaluate', async (req: Request, res: Response) => {
+  try {
+    const { texts, labels } = req.body;
+    const result = await mlService.evaluateModel(req.params.id, texts, labels);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Model evaluation failed'
+    });
+  }
+});
+
 export default router;

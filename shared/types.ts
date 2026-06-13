@@ -108,6 +108,28 @@ export interface BatchPredictResponse {
   predictions: BatchPredictResult[];
 }
 
+export interface IncrementalTrainRequest {
+  datasetId?: string;
+  texts?: string[];
+  labels?: string[];
+}
+
+export interface IncrementalTrainResponse {
+  success: boolean;
+  modelId: string;
+  samplesAdded: number;
+  totalSamples: number;
+  incrementalCount: number;
+  classes: string[];
+}
+
+export interface EvaluateResponse {
+  success: boolean;
+  modelId: string;
+  metrics: ModelMetrics;
+  sampleCount: number;
+}
+
 export interface AppState {
   currentDataset: Dataset | null;
   datasetPreview: DatasetPreview | null;

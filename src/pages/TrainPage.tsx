@@ -5,11 +5,12 @@ import { apiService } from '@/services/api';
 import { useAppStore } from '@/store/appStore';
 import MetricCard from '@/components/MetricCard';
 import ConfusionMatrix from '@/components/ConfusionMatrix';
+import IncrementalLearning from '@/components/IncrementalLearning';
 import type { TrainConfig, TrainStatus as TrainStatusType } from '../../shared/types';
 
 const TrainPage = () => {
   const navigate = useNavigate();
-  const { currentDataset, trainStatus, setTrainStatus, setCurrentModelId } = useAppStore();
+  const { currentDataset, trainStatus, setTrainStatus, currentModelId, setCurrentModelId } = useAppStore();
   const [featureType, setFeatureType] = useState<'tfidf' | 'bow'>('tfidf');
   const [classifierType, setClassifierType] = useState<'multinomial' | 'bernoulli'>('multinomial');
   const [testSize, setTestSize] = useState(0.2);
@@ -561,6 +562,22 @@ const TrainPage = () => {
                   <ConfusionMatrix
                     data={trainStatus.metrics.confusionMatrix}
                     labels={trainStatus.metrics.labels}
+                  />
+                )}
+
+                {currentModelId && (
+                  <IncrementalLearning
+                    modelId={currentModelId}
+                    onSuccess={() => {
+                      if (trainStatus?.metrics) {
+                        setTrainStatus({
+                          ...trainStatus,
+                          metrics: {
+                            ...trainStatus.metrics,
+                          },
+                        });
+                      }
+                    }}
                   />
                 )}
               </>

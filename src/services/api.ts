@@ -9,6 +9,9 @@ import type {
   Dataset,
   DatasetPreview,
   ModelInfo,
+  IncrementalTrainRequest,
+  IncrementalTrainResponse,
+  EvaluateResponse,
 } from '../../shared/types';
 
 const API_BASE_URL = '/api/ml';
@@ -65,6 +68,16 @@ export const apiService = {
 
   async predictBatch(modelId: string, texts: string[]): Promise<BatchPredictResponse> {
     const response = await apiClient.post('/predict/batch', { modelId, texts });
+    return response.data;
+  },
+
+  async incrementalTrain(modelId: string, data: IncrementalTrainRequest): Promise<IncrementalTrainResponse> {
+    const response = await apiClient.post(`/models/${modelId}/incremental`, data);
+    return response.data;
+  },
+
+  async evaluateModel(modelId: string, texts: string[], labels: string[]): Promise<EvaluateResponse> {
+    const response = await apiClient.post(`/models/${modelId}/evaluate`, { texts, labels });
     return response.data;
   },
 };

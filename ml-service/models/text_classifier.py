@@ -511,3 +511,140 @@ def predict_batch(model_id: str, texts: List[str]) -> Dict[str, Any]:
         'success': True,
         'predictions': results
     }
+
+
+def incremental_train(model_id: str, texts: List[str], labels: List[str]) -> Dict[str, Any]:
+    model_meta_path = os.path.join(META_DIR, f"{model_id}_model.json")
+    if not os.path.exists(model_meta_path):
+        raise ValueError("Model not found")
+    
+    with open(model_meta_path, 'r', encoding='utf-8') as f:
+        model_meta = json.load(f)
+    
+    if model_meta['status'] != 'completed':
+        raise ValueError("Model training not completed")
+    
+    if len(texts) != len(labels):
+        raise ValueError("Number of texts and labels must match")
+    
+    if len(texts) == 0:
+        raise ValueError("No training data provided")
+    
+    use_stopwords = model_meta.get('useStopwords', True)
+    use_chinese_tokenization = model_meta.get('useChineseTokenization', True)
+    
+    model_path = model_meta['modelPath']
+    vectorizer_path = model_meta['vectorizerPath']
+    
+    classifier = joblib.load(model_path)
+    vectorizer = joblib.load(vectorizer_path)
+    
+    processed_texts = preprocess_texts(texts, use_stopwords=use_stopwords, use_chinese_tokenization=use_chinese_tokenization)
+    
+    existing_classes = list(classifier.classes_)
+    new_classes = [l for l in set(labels) if l not in existing_classes]
+    
+    if new_classes:
+        raise ValueError(f"Found new labels not in original model: {new_classes}. "
+                        f"Original labels: {existing_classes}. "
+                        f"Please use full retraining for new labels.")
+    
+    texts_vec = vectorizer.transform(processed_texts)
+    
+    if hasattr(classifier, 'partial_fit'):
+        classifier.partial_fit(texts_vec, labels, classes=existing_classes)
+    else:
+        raise ValueError("Current classifier does not support incremental learning")
+    
+    joblib.dump(classifier, model_path)
+    
+    total_samples = model_meta.get('totalSamples', 0) + len(texts)
+    incremental_count = model_meta.get('incrementalCount', 0) + 1
+    
+    model_meta.update({
+        'totalSamples': total_samples,
+        'incrementalCount': incremental_count,
+        'lastIncrementalAt': time.time()
+    })
+    
+    with open(model_meta_path, 'w', encoding='utf-8') as f:
+        json.dump(model_meta, f, ensure_ascii=False)
+    
+    with _lock:
+        if model_id in _training_tasks:
+            _training_tasks[model_id].update(model_meta)
+    
+    return {
+        'success': True,
+        'modelId': model_id,
+        'samplesAdded': len(texts),
+        'totalSamples': total_samples,
+        'incrementalCount': incremental_count,
+        'classes': existing_classes
+    }
+
+
+def incremental_train_from_dataset(model_id: str, dataset_id: str) -> Dict[str, Any]:
+    dataset_meta_path = os.path.join(META_DIR, f"{dataset_id}_dataset.json")
+    if not os.path.exists(dataset_meta_path):
+        raise ValueError("Dataset not found")
+    
+    with open(dataset_meta_path, 'r', encoding='utf-8') as f:
+        dataset_meta = json.load(f)
+    
+    df = pd.read_csv(dataset_meta['filePath'])
+    texts = df['text'].fillna('').astype(str).tolist()
+    labels = df['label'].tolist()
+    
+    return incremental_train(model_id, texts, labels)
+
+
+def evaluate_model(model_id: str, texts: List[str], labels: List[str]) -> Dict[str, Any]:
+    model_meta_path = os.path.join(META_DIR, f"{model_id}_model.json")
+    if not os.path.exists(model_meta_path):
+        raise ValueError("Model not found")
+    
+    with open(model_meta_path, 'r', encoding='utf-8') as f:
+        model_meta = json.load(f)
+    
+    if model_meta['status'] != 'completed':
+        raise ValueError("Model training not completed")
+    
+    if len(texts) != len(labels):
+        raise ValueError("Number of texts and labels must match")
+    
+    use_stopwords = model_meta.get('useStopwords', True)
+    use_chinese_tokenization = model_meta.get('useChineseTokenization', True)
+    
+    model_path = model_meta['modelPath']
+    vectorizer_path = model_meta['vectorizerPath']
+    
+    classifier = joblib.load(model_path)
+    vectorizer = joblib.load(vectorizer_path)
+    
+    processed_texts = preprocess_texts(texts, use_stopwords=use_stopwords, use_chinese_tokenization=use_chinese_tokenization)
+    texts_vec = vectorizer.transform(processed_texts)
+    
+    y_pred = classifier.predict(texts_vec)
+    
+    accuracy = accuracy_score(labels, y_pred)
+    precision = precision_score(labels, y_pred, average='weighted', zero_division=0)
+    recall = recall_score(labels, y_pred, average='weighted', zero_division=0)
+    f1 = f1_score(labels, y_pred, average='weighted', zero_division=0)
+    
+    labels_list = sorted(classifier.classes_.tolist())
+    cm = confusion_matrix(labels, y_pred, labels=labels_list)
+    
+    return {
+        'success': True,
+        'modelId': model_id,
+        'metrics': {
+            'accuracy': float(accuracy),
+            'precision': float(precision),
+            'recall': float(recall),
+            'f1': float(f1),
+            'confusionMatrix': cm.tolist(),
+            'labels': labels_list
+        },
+        'sampleCount': len(texts)
+    }
